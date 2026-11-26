@@ -190,22 +190,41 @@ def split_name(name):
     return (m.group(1), m.group(2)) if m else (name, "")
 
 
-def visits_html(text):
-    out, group = [], None
-    for line in text.splitlines():
+PHASE = [("p1", "통증 완화"), ("p2", "회복"), ("p3", "재발 예방")]
+
+
+def visit_groups(text):
+    """주차별 내원 주기 → [(그룹명, [(단계, 기간, 횟수, 메모), ...])]. 그룹 안 첫 줄=통증 완화, 마지막 줄(3줄 이상)=재발 예방, 나머지=회복"""
+    groups, cur = [], None
+    for line in (text or "").splitlines():
         line = line.strip()
         if not line:
             continue
         if line.startswith("[") and line.endswith("]"):
-            out.append(f'<li class="tl-group">{e(line[1:-1])}</li>')
-            continue
+            cur = (line[1:-1], []); groups.append(cur); continue
+        if cur is None:
+            cur = ("", []); groups.append(cur)
         m = re.match(r"^([^:]+):\s*(.*)$", line)
-        label, rest = (m.group(1), m.group(2)) if m else (line, "")
+        label, rest = (m.group(1).strip(), m.group(2)) if m else (line, "")
         n = re.match(r"^(.*?)\s*\((.*)\)\s*$", rest)
         freq, note = (n.group(1), n.group(2)) if n else (rest, "")
-        out.append('<li><span class="dot"></span><div class="tl-body"><div class="tl-head">'
-                   f'<h3>{e(label)}</h3>' + (f'<span class="visit">{e(freq)}</span>' if freq else "") +
-                   '</div>' + (f'<p class="small muted">{e(note)}</p>' if note else "") + '</div></li>')
+        cur[1].append([label, freq.strip(), note.strip()])
+    out = []
+    for name, rows in groups:
+        k = len(rows)
+        out.append((name, [(PHASE[0] if i == 0 else PHASE[2] if (i == k - 1 and k >= 3) else PHASE[1], *r) for i, r in enumerate(rows)]))
+    return out
+
+
+def visits_html(text):
+    out = []
+    for name, rows in visit_groups(text):
+        if name:
+            out.append(f'<li class="tl-group">{e(name)}</li>')
+        for (cls, ph), label, freq, note in rows:
+            out.append(f'<li class="{cls}"><span class="dot"></span><div class="tl-body"><div class="tl-head">'
+                       f'<span class="phase">{ph}</span><h3>{e(label)}</h3>' + (f'<span class="visit">{e(freq)}</span>' if freq else "") +
+                       '</div>' + (f'<p class="small muted">{e(note)}</p>' if note else "") + '</div></li>')
     return '<ol class="timeline">' + "".join(out) + "</ol>"
 
 
@@ -348,14 +367,16 @@ def page(d, css_v):
     if desc:
         rows.append(("지금 상태", e(desc[0])))
     if d["dur"]:
-        rows.append(("치료 기간", f'보통 <b>{e(d["dur"])}</b>'))
+        pass
     if fv:
-        rows.append(("내원", f'처음 {e(fv[0])}는 <b>{e(fv[1])}</b> 오세요'))
+        rows.append(("통증 완화", f'<b>{e(fv[0])}</b> · {e(fv[1])}'))
+    if d["dur"]:
+        rows.append(("재발 예방", f'<b>{e(d["dur"])}</b>까지 · 내원 점차 감소'))
     home = [re.sub(r"\s*\([^)]*\)\s*$", "", x["title"]) for x in d["ls"][:2]]
     if d["rh"]:
         home.append(f'재활운동 {len(d["rh"])}가지')
     if home:
-        rows.append(("집에서", " · ".join(e(x) for x in home)))
+        rows.append(("집에서", '<ul class="home">' + "".join(f"<li>{e(x)}</li>" for x in home) + '</ul>'))
     summary = ('<section id="sum" class="summary"><h2>진료 요약</h2><dl>'
                + "".join(f'<div><dt>{k}</dt><dd>{v}</dd></div>' for k, v in rows) + '</dl>'
                + (f'<a class="redlink" href="#call">이럴 땐 바로 연락하세요 ›</a>' if d["red"] else "") + '</section>')
@@ -370,14 +391,11 @@ def page(d, css_v):
                + '</div></section>')
 
     # 3) 내원 일정 (내원 유도)
-    why = []
-    if fv:
-        why.append(f'<b>처음 {e(fv[0])}가 가장 중요해요.</b> 자주 치료할수록 빨리 가라앉습니다.')
-    why.append('<b>안 아파도 다 나은 게 아니에요.</b> 중간에 멈추면 다시 아프기 쉽습니다.')
-    why.append('<b>올 때마다 운동 단계를 올려 드려요.</b>')
+    why = [("통증", "먼저 소실"), ("조직 회복", "더 느림 → 조기 중단 시 재발"),
+           ("통증 소실 후", "내원 간격 조절·마무리 가능"), ("재발 잦은 경우", "회복 단계까지 권장")]
     sec.append('<section id="course"><h2><span class="n">2</span>내원주기</h2>'
                + (f'<div class="panel">{visits_html(d["visits"])}</div>' if d["visits"] else "")
-               + '<ul class="why">' + "".join(f"<li>{x}</li>" for x in why) + '</ul>'
+               + '<dl class="why">' + "".join(f"<div><dt>{k}</dt><dd>{v}</dd></div>" for k, v in why) + '</dl>'
                + (f'<details><summary>회복 과정 자세히</summary><p class="small">{e(d["course"])}</p></details>' if d["course"] else "")
                + actions(info, "mid") + '</section>')
 
@@ -404,7 +422,7 @@ def page(d, css_v):
 <title>{e(title)}</title>
 <meta property="og:type" content="article">
 <meta property="og:title" content="{e(main)} 생활 안내 | {CLINIC}">
-<meta property="og:description" content="치료 기간, 내원 일정, 집에서 할 일을 한눈에">
+<meta property="og:description" content="내원 주기, 생활관리, 집에서 하는 재활운동">
 <meta property="og:image" content="{og}">
 <meta property="og:url" content="{url}">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">

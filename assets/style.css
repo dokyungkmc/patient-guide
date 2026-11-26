@@ -124,3 +124,14 @@ header.top .sub{margin-top:0;font-size:.95rem;line-height:1.5}
 .calm h2{font-size:1.3rem;color:var(--accent)}
 .calm .tx{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:6px;font-size:.97rem}
 [hidden]{display:none!important}
+.phase{font-size:.78rem;font-weight:700;padding:1px 8px;border-radius:6px;color:var(--surface);background:currentColor}
+.timeline li.p1{color:var(--stage1)} .timeline li.p2{color:var(--stage2)} .timeline li.p3{color:var(--stage3)}
+.timeline li .phase{color:inherit}
+.timeline li .phase{background:currentColor}
+.phase{color:#fff!important}
+.timeline li.p1 .phase{background:var(--stage1)} .timeline li.p2 .phase{background:var(--stage2)} .timeline li.p3 .phase{background:var(--stage3)}
+dl.why{margin:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+dl.why div{display:grid;grid-template-columns:7.2em 1fr;gap:8px;align-items:baseline;font-size:.97rem}
+dl.why dt{font-weight:700;color:var(--accent)}
+dl.why dd{margin:0}
+.summary ul.home{margin:0;padding-left:1.1em;display:flex;flex-direction:column;gap:2px}
