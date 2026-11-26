@@ -218,26 +218,46 @@ def mmss(s):
     return f"{s // 60}분 {s % 60}초" if s % 60 else f"{s // 60}분"
 
 
+def sentences(t):
+    return [x for x in re.split(r"(?<=[.!?])\s+", (t or "").strip()) if x]
+
+
+def when_row(it):
+    st = [s for s in it["stages"] if s in STAGE]
+    if not st:
+        return ""
+    txt = "모든 시기" if len(st) == len(STAGE) else " · ".join(STAGE[s][1] for s in st)
+    dots = "".join(f'<i class="{STAGE[s][0]}"></i>' for s in st)
+    return f'<p class="meta"><span class="k">해당 시기</span><span class="v"><span class="dots">{dots}</span>{e(txt)}</span></p>'
+
+
 def card(it, kind):
-    chips = "".join(f'<span class="chip {STAGE[s][0]}">{STAGE[s][1]}</span>' for s in it["stages"] if s in STAGE)
     player = ""
     if it["video"]:
-        note = f"영상 {mmss(it['start'])}부터 재생됩니다" if it["start"] else "눌러서 영상 보기"
+        note = f"{mmss(it['start'])}부터 재생" if it["start"] else "눌러서 영상 보기"
         player = (f'<div class="player"><button class="poster" type="button" data-id="{it["video"]}" data-start="{it["start"]}" '
                   f'style="background-image:url(https://i.ytimg.com/vi/{it["video"]}/hqdefault.jpg)" aria-label="{e(it["title"])} 영상 재생">'
                   f'<span class="play">{PLAY}</span><span class="pfoot">{e(note)}</span></button></div>')
-    how = ""
-    if it["how"]:
-        how = (f'<details{" open" if kind == "rh" else ""}><summary>{"하는 방법" if kind == "rh" else "실천 방법"}</summary>'
-               '<ol class="how small">' + "".join(f"<li>{e(x)}</li>" for x in it["how"]) + "</ol></details>")
+    title = re.sub(r"\s*\([^)]*\)\s*$", "", it["title"].replace("[루틴]", "따라 하기:").strip())
+    rows = "" if (kind == "ls" and it.get("when")) else when_row(it)
+    if it.get("when"):
+        rows += f'<p class="meta"><span class="k">언제 하나요</span><span class="v">{e(it["when"])}</span></p>'
+    if it.get("dose"):
+        dose = re.sub(r"\s*\([^)]*\)\s*$", "", it["dose"])
+        rows += f'<p class="meta"><span class="k">횟수</span><span class="v">{e(dose)}</span></p>'
+    desc = sentences(it["desc"])
+    first, later = (desc[:1], desc[1:]) if kind == "ls" else ([], desc)
+    more = ""
+    if it["how"] or it["stop"]:
+        more = ('<details><summary>' + ("하는 방법·멈출 때" if kind == "rh" else "자세히 보기") + '</summary>'
+                + "".join(f'<p class="small">{e(x)}</p>' for x in later)
+                + ('<ol class="how">' + "".join(f"<li>{e(x)}</li>" for x in it["how"]) + "</ol>" if it["how"] else "")
+                + (f'<p class="stop"><b>{"이럴 땐 멈추세요" if kind == "rh" else "주의"}</b> {e(it["stop"])}</p>' if it["stop"] else "")
+                + '</details>')
     return ('<article class="card">' + player + '<div class="card-body">'
-            + (f'<div class="stagechips">{chips}</div>' if chips else "")
-            + f'<h3>{e(it["title"].replace("[루틴]", "따라 하기:").strip())}</h3>'
+            + f'<h3>{e(title)}</h3>'
             + (f'<div class="channel">{YTI}<span>{e(it["channel"])}</span></div>' if it["video"] and it["channel"] else "")
-            + (f'<p>{e(it["desc"])}</p>' if it["desc"] else "") + how
-            + (f'<p class="small"><span class="muted">횟수</span> <b>{e(it["dose"])}</b></p>' if it.get("dose") else "")
-            + (f'<p class="small"><span class="muted">언제</span> <b>{e(it["when"])}</b></p>' if it.get("when") else "")
-            + (f'<p class="stop"><b>{"멈춰야 할 때" if kind == "rh" else "주의"}</b> {e(it["stop"])}</p>' if it["stop"] else "")
+            + (f'<p>{e(first[0])}</p>' if first else "") + rows + more
             + "</div></article>")
 
 
@@ -274,32 +294,98 @@ def body_map(code):
             + dots + '</svg>')
 
 
+def clinic_info():
+    """clinic.json: {"tel": "...", "booking": "https://...", "map": "https://..."} 비어 있으면 버튼을 숨김"""
+    f = Path(os.environ.get("CLINIC_JSON", ROOT / "clinic.json"))
+    return json.loads(f.read_text()) if f.exists() else {}
+
+
+def first_visit(text):
+    """주차별 내원 주기의 첫 줄 → ('1~2주차', '주 3~5회')"""
+    for line in (text or "").splitlines():
+        line = line.strip()
+        m = re.match(r"^([^:\[]+):\s*(.*?)\s*(?:\(.*\))?$", line)
+        if m:
+            return m.group(1).strip(), m.group(2).strip()
+    return None
+
+
+def actions(info, where):
+    btn = []
+    if info.get("tel"):
+        btn.append(f'<a class="btn primary" href="tel:{e(info["tel"].replace("-", ""))}">{TEL}전화로 예약</a>')
+    if info.get("booking"):
+        btn.append(f'<a class="btn" href="{e(info["booking"])}" target="_blank" rel="noopener">{CAL}예약하기</a>')
+    if info.get("map"):
+        btn.append(f'<a class="btn" href="{e(info["map"])}" target="_blank" rel="noopener">{PIN}오시는 길</a>')
+    return f'<div class="actions {where}">' + "".join(btn) + '</div>' if btn else ""
+
+
+TEL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 10.8a15 15 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg>'
+CAL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2zm-2 8h14v10H5z"/></svg>'
+PIN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>'
+
+
 def page(d, css_v):
     main, sub = split_name(d["name"])
     url = f'{BASE_URL}/{d["slug"]}/'
     og = f'{BASE_URL}/og/{d["region"]["code"].lower()}.png'
-    sec = []
-    sec.append('<section id="what"><span class="eyebrow">어떤 상태인가요</span>'
-               f'<div class="panel">{figure(d)}' + "".join(f"<p>{e(s)}</p>" for s in re.split(r"(?<=\.)\s+", d["desc"]) if s) + '</div></section>')
-    course = ('<section id="course"><span class="eyebrow">회복 과정과 내원 주기</span>'
-              + (f'<h2>보통 {e(d["dur"])} 정도 치료합니다</h2>' if d["dur"] else "<h2>회복 과정</h2>")
-              + (f'<p class="muted">{e(d["course"])}</p>' if d["course"] else "")
-              + (f'<div class="panel">{visits_html(d["visits"])}</div>' if d["visits"] else "")
-              + '<p class="small muted">내원 횟수는 회복 속도에 따라 원장님이 조정합니다.</p></section>')
-    sec.append(course)
-    if d["ls"]:
-        sec.append('<section id="life"><span class="eyebrow">생활 관리</span><h2>생활에서 이렇게 해 주세요</h2>'
-                   + "".join(card(x, "ls") for x in d["ls"]) + '</section>')
+    info = clinic_info()
+    desc = sentences(d["desc"])
+    fv = first_visit(d["visits"])
+
+    # 1) 한눈에 보기 (두괄식 요약)
+    rows = []
+    if desc:
+        rows.append(("지금 상태", e(desc[0])))
+    if d["dur"]:
+        rows.append(("치료 기간", f'보통 <b>{e(d["dur"])}</b>'))
+    if fv:
+        rows.append(("내원", f'처음 {e(fv[0])}는 <b>{e(fv[1])}</b> 오세요'))
+    home = [re.sub(r"\s*\([^)]*\)\s*$", "", x["title"]) for x in d["ls"][:2]]
     if d["rh"]:
-        sec.append('<section id="exercise"><span class="eyebrow">재활운동</span><h2>회복 단계에 맞춰 하나씩 늘려 가요</h2>'
-                   '<p class="muted small">원장님이 알려 드린 단계의 운동만 해 주세요. 색 표시는 언제 하는 운동인지 알려 줍니다.</p>'
+        home.append(f'재활운동 {len(d["rh"])}가지')
+    if home:
+        rows.append(("집에서", " · ".join(e(x) for x in home)))
+    summary = ('<section id="sum" class="summary"><h2>한눈에 보기</h2><dl>'
+               + "".join(f'<div><dt>{k}</dt><dd>{v}</dd></div>' for k, v in rows) + '</dl>'
+               + (f'<a class="redlink" href="#call">이럴 땐 바로 연락하세요 ›</a>' if d["red"] else "") + '</section>')
+    sec = [summary]
+
+    # 2) 어떤 상태인가요: 그림 + 두 문장, 나머지는 접기
+    rest = desc[1:2]
+    more = desc[2:]
+    sec.append('<section id="what"><h2><span class="n">1</span>어떤 상태인가요</h2>'
+               f'<div class="panel">{figure(d)}' + "".join(f"<p>{e(x)}</p>" for x in rest)
+               + (f'<details><summary>더 읽기</summary>' + "".join(f"<p>{e(x)}</p>" for x in more) + '</details>' if more else "")
+               + '</div></section>')
+
+    # 3) 내원 일정 (내원 유도)
+    why = []
+    if fv:
+        why.append(f'<b>처음 {e(fv[0])}가 가장 중요해요.</b> 자주 치료할수록 빨리 가라앉습니다.')
+    why.append('<b>안 아파도 다 나은 게 아니에요.</b> 중간에 멈추면 다시 아프기 쉽습니다.')
+    why.append('<b>올 때마다 운동 단계를 올려 드려요.</b>')
+    sec.append('<section id="course"><h2><span class="n">2</span>이렇게 오셔야 빨리 낫습니다</h2>'
+               + (f'<div class="panel">{visits_html(d["visits"])}</div>' if d["visits"] else "")
+               + '<ul class="why">' + "".join(f"<li>{x}</li>" for x in why) + '</ul>'
+               + (f'<details><summary>회복 과정 자세히</summary><p class="small">{e(d["course"])}</p></details>' if d["course"] else "")
+               + actions(info, "mid") + '</section>')
+
+    n = 3
+    if d["ls"]:
+        sec.append(f'<section id="life"><h2><span class="n">{n}</span>생활에서 이렇게 해 주세요</h2>'
+                   + "".join(card(x, "ls") for x in d["ls"]) + '</section>')
+        n += 1
+    if d["rh"]:
+        legend = "".join(f'<span><i class="{c}"></i>{t}</span>' for c, t in STAGE.values())
+        sec.append(f'<section id="exercise"><h2><span class="n">{n}</span>집에서 하는 재활운동</h2>'
+                   '<p class="note">진료 때 알려 드린 시기의 운동만 해 주세요. 하다가 아프거나 저림이 심해지면 바로 멈추세요.</p>'
+                   f'<div class="legend">{legend}</div>'
                    + "".join(card(x, "rh") for x in d["rh"]) + '</section>')
     if d["red"]:
         sec.append('<section id="call" class="red"><h2>이럴 땐 바로 연락하거나 병원에 가세요</h2><ul>'
-                   + "".join(f"<li>{e(x)}</li>" for x in d["red"]) + '</ul></section>')
-    toc = [("what", "어떤 상태인가요"), ("course", "회복 과정·내원")] + \
-          ([("life", "생활 관리")] if d["ls"] else []) + ([("exercise", "재활운동")] if d["rh"] else []) + \
-          ([("call", "바로 연락할 때")] if d["red"] else [])
+                   + "".join(f"<li>{e(x)}</li>" for x in d["red"]) + '</ul>' + actions(info, "red-act") + '</section>')
     title = f"{main} 안내 | {CLINIC}"
     return f"""<!doctype html>
 <html lang="ko"><head>
@@ -309,19 +395,16 @@ def page(d, css_v):
 <title>{e(title)}</title>
 <meta property="og:type" content="article">
 <meta property="og:title" content="{e(main)} 생활 안내 | {CLINIC}">
-<meta property="og:description" content="회복 과정, 내원 주기, 생활 관리, 집에서 하는 재활운동">
+<meta property="og:description" content="치료 기간, 내원 일정, 집에서 할 일을 한눈에">
 <meta property="og:image" content="{og}">
 <meta property="og:url" content="{url}">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="../assets/style.css?v={css_v}">
 </head><body><div class="wrap">
 <header><div class="clinic"><i></i>{CLINIC} · 진료 후 안내</div>
-<h1>{e(main)}</h1>{f'<p class="sub">{e(sub)}</p>' if sub else ''}
-<p class="lead">오늘 진료에서 말씀드린 내용을 정리했습니다. 집에서 천천히 다시 읽어 보시고, 영상을 보며 따라 해 보세요.</p>
-<nav class="toc" aria-label="바로가기">{"".join(f'<a href="#{a}">{b}</a>' for a, b in toc)}</nav></header>
+<h1>{e(main)}</h1>{f'<p class="sub">{e(sub)}</p>' if sub else ''}</header>
 {"".join(sec)}
-<footer><p>이 안내문은 진료를 돕기 위한 일반 정보입니다. 증상과 운동 단계는 사람마다 다르니 진료 때 꼭 상의해 주세요.</p>
-<p>영상은 각 채널이 유튜브에 공개한 자료를 연결한 것이며, 저작권은 각 채널에 있습니다.</p></footer>
+<footer><p>일반적인 안내입니다. 증상과 운동 단계는 사람마다 달라 진료 때 꼭 상의해 주세요. 영상의 저작권은 각 유튜브 채널에 있습니다.</p></footer>
 </div><script src="../assets/app.js?v={css_v}"></script></body></html>
 """
 
@@ -373,18 +456,23 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--write-urls", action="store_true", help="노션 질환 DB에 공개 주소 기록 (공개 배포 후)")
     ap.add_argument("--from-json")
+    ap.add_argument("--from-model", help=argparse.SUPPRESS)  # 시안 미리보기 전용
     ap.add_argument("--dump")
     ap.add_argument("--all-videos", action="store_true")
     ap.add_argument("--out", default=str(ROOT / "site"))
     a = ap.parse_args()
-    data = load(a.from_json)
+    if a.from_model:
+        data, diseases = None, json.loads(Path(a.from_model).read_text())
+    else:
+        data = load(a.from_json)
     if a.dump:
         Path(a.dump).mkdir(parents=True, exist_ok=True)
         for k, v in data.items():
             (Path(a.dump) / f"{k}.json").write_text(json.dumps(v, ensure_ascii=False))
         print("저장:", a.dump)
         return
-    diseases = build_model(data, a.all_videos)
+    if data is not None:
+        diseases = build_model(data, a.all_videos)
     out = Path(a.out)
     if out.exists():
         shutil.rmtree(out)
@@ -404,7 +492,7 @@ def main():
           "videos": sum(1 for x in d["ls"] + d["rh"] if x["video"])} for d in diseases], ensure_ascii=False, indent=1))
     n_vid = sum(1 for d in diseases for x in d["ls"] + d["rh"] if x["video"])
     if a.write_urls:
-        if a.all_videos or a.from_json:
+        if a.all_videos or a.from_json or a.from_model:
             sys.exit("--write-urls 는 노션에서 읽은 공개용 빌드에서만 씁니다.")
         write_urls(data, diseases)
     print(f"질환 페이지 {len(diseases)}개, 영상 {n_vid}개 → {out}" + ("  [내부 미리보기: 모든 영상 포함]" if a.all_videos else ""))
