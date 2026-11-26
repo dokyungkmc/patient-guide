@@ -293,6 +293,30 @@ def body_map(code):
             + dots + '</svg>')
 
 
+# 치료 종류별 '치료 후' 안내. 카톡 링크 끝에 #t=acu.pha.chuna 처럼 코드만 붙이면 페이지가 해당 치료만 보여 줌.
+# (# 뒤는 서버로 전송되지 않아 GitHub에 기록되지 않음. 이름·연락처 등 개인정보는 넣지 않음)
+TREAT = {
+    "acu":   ("침", "침 놓은 자리가 하루 이틀 묵직하거나, 작은 멍이 들 수 있어요. 뭉친 근육이 풀리면서 생기는 반응입니다."),
+    "eacu":  ("전침", "근육을 여러 번 움직여 주어서, 운동한 다음 날처럼 하루 이틀 뻐근할 수 있어요."),
+    "pha":   ("약침", "약침 놓은 자리가 1~2일 붓거나 묵직할 수 있어요. 약이 퍼지면서 생기는 반응이라 저절로 가라앉습니다."),
+    "cup":   ("부항", "둥근 자국이 3~7일 남을 수 있어요. 멍과 달리 아프지 않고, 뭉친 곳일수록 진하게 나옵니다."),
+    "wcup":  ("습식 부항", "자국과 작은 상처가 며칠 남을 수 있어요. 오늘은 그 자리를 깨끗하게 두고, 사우나·목욕탕은 하루 쉬세요."),
+    "chuna": ("추나", "틀어진 관절과 주변 근육 위치가 바뀌면서 1~2일 뻐근하거나 몸살 기운이 있을 수 있어요."),
+    "moxa":  ("뜸", "뜸 자리가 붉어질 수 있어요. 물집이 생기면 터뜨리지 말고 다음 진료 때 보여 주세요."),
+    "herb":  ("한약", "처음 며칠은 속이 더부룩하거나 변이 묽어질 수 있어요. 계속되면 연락 주세요."),
+}
+
+
+def after_care():
+    """치료 후 더 아플 수 있다는 안심 안내 (항상 표시) + 치료별 문구 (링크에 치료 코드가 있을 때만 표시)"""
+    items = "".join(f'<li data-t="{k}" hidden><b>{e(n)}</b> {e(t)}</li>' for k, (n, t) in TREAT.items())
+    return ('<section id="after" class="calm"><h2>치료 후 더 아플 수 있어요</h2>'
+            '<p><b>오늘·내일 1~2일은 더 뻐근하거나 아플 수 있습니다.</b> 굳어 있던 근육이 풀리고 혈액 순환이 늘면서 생기는 '
+            '정상 반응으로, 운동한 다음 날 근육통과 비슷합니다. 대부분 48시간 안에 가라앉아요.</p>'
+            f'<ul class="tx">{items}</ul>'
+            '<p class="small">이틀이 지나도 점점 심해지거나, 열·붓기·저림이 새로 생기면 연락 주세요.</p></section>')
+
+
 def clinic_info():
     """clinic.json: {"tel": "...", "booking": "https://...", "map": "https://..."} 비어 있으면 버튼을 숨김"""
     f = Path(os.environ.get("CLINIC_JSON", ROOT / "clinic.json"))
@@ -334,7 +358,7 @@ def page(d, css_v):
     fv = first_visit(d["visits"])
 
     # 1) 한눈에 보기 (두괄식 요약)
-    rows = []
+    rows = [("오늘 치료", '<span id="today"></span>')]
     if desc:
         rows.append(("지금 상태", e(desc[0])))
     if d["dur"]:
@@ -347,9 +371,9 @@ def page(d, css_v):
     if home:
         rows.append(("집에서", " · ".join(e(x) for x in home)))
     summary = ('<section id="sum" class="summary"><h2>진료 요약</h2><dl>'
-               + "".join(f'<div><dt>{k}</dt><dd>{v}</dd></div>' for k, v in rows) + '</dl>'
+               + "".join((f'<div{" class=today hidden" if k == "오늘 치료" else ""}><dt>{k}</dt><dd>{v}</dd></div>') for k, v in rows) + '</dl>'
                + (f'<a class="redlink" href="#call">이럴 땐 바로 연락하세요 ›</a>' if d["red"] else "") + '</section>')
-    sec = [summary]
+    sec = [summary, after_care()]
 
     # 2) 어떤 상태인가요: 그림 + 두 문장, 나머지는 접기
     rest = desc[1:2]
