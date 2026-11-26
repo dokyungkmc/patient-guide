@@ -364,7 +364,7 @@ def page(d, css_v):
     # 2) 어떤 상태인가요: 그림 + 두 문장, 나머지는 접기
     rest = desc[1:2]
     more = desc[2:]
-    sec.append('<section id="what"><h2><span class="n">1</span>어떤 상태인가요</h2>'
+    sec.append('<section id="what"><h2><span class="n">1</span>상태설명</h2>'
                f'<div class="panel">{figure(d)}' + "".join(f"<p>{e(x)}</p>" for x in rest)
                + (f'<details><summary>상세내용</summary>' + "".join(f"<p>{e(x)}</p>" for x in more) + '</details>' if more else "")
                + '</div></section>')
@@ -375,7 +375,7 @@ def page(d, css_v):
         why.append(f'<b>처음 {e(fv[0])}가 가장 중요해요.</b> 자주 치료할수록 빨리 가라앉습니다.')
     why.append('<b>안 아파도 다 나은 게 아니에요.</b> 중간에 멈추면 다시 아프기 쉽습니다.')
     why.append('<b>올 때마다 운동 단계를 올려 드려요.</b>')
-    sec.append('<section id="course"><h2><span class="n">2</span>이렇게 오셔야 빨리 낫습니다</h2>'
+    sec.append('<section id="course"><h2><span class="n">2</span>내원주기</h2>'
                + (f'<div class="panel">{visits_html(d["visits"])}</div>' if d["visits"] else "")
                + '<ul class="why">' + "".join(f"<li>{x}</li>" for x in why) + '</ul>'
                + (f'<details><summary>회복 과정 자세히</summary><p class="small">{e(d["course"])}</p></details>' if d["course"] else "")
@@ -383,12 +383,12 @@ def page(d, css_v):
 
     n = 3
     if d["ls"]:
-        sec.append(f'<section id="life"><h2><span class="n">{n}</span>생활에서 이렇게 해 주세요</h2>'
+        sec.append(f'<section id="life"><h2><span class="n">{n}</span>생활관리</h2>'
                    + "".join(card(x, "ls") for x in d["ls"]) + '</section>')
         n += 1
     if d["rh"]:
         legend = "".join(f'<span><i class="{c}"></i>{t}</span>' for c, t in STAGE.values())
-        sec.append(f'<section id="exercise"><h2><span class="n">{n}</span>집에서 하는 재활운동</h2>'
+        sec.append(f'<section id="exercise"><h2><span class="n">{n}</span>재활운동</h2>'
                    '<p class="note">진료 때 알려 드린 시기의 운동만 해 주세요. 하다가 아프거나 저림이 심해지면 바로 멈추세요.</p>'
                    f'<div class="legend">{legend}</div>'
                    + "".join(card(x, "rh") for x in d["rh"]) + '</section>')
