@@ -268,8 +268,7 @@ def figure(d):
         cap = (ROOT / "figures" / f'{d["slug"]}.txt')
         cap = cap.read_text().strip() if cap.exists() else ""
     else:
-        svg = body_map(d["region"]["code"])
-        cap = f'아픈 부위: {d["region"]["name"]}'
+        return ""  # 질환 전용 그림이 없으면 넣지 않음 (부위 표시 그림은 2026-11-26 원장 요청으로 뺌)
     return f'<figure>{svg}' + (f'<figcaption>{e(cap)}</figcaption>' if cap else "") + '</figure>'
 
 
@@ -347,7 +346,7 @@ def page(d, css_v):
         home.append(f'재활운동 {len(d["rh"])}가지')
     if home:
         rows.append(("집에서", " · ".join(e(x) for x in home)))
-    summary = ('<section id="sum" class="summary"><h2>한눈에 보기</h2><dl>'
+    summary = ('<section id="sum" class="summary"><h2>진료 요약</h2><dl>'
                + "".join(f'<div><dt>{k}</dt><dd>{v}</dd></div>' for k, v in rows) + '</dl>'
                + (f'<a class="redlink" href="#call">이럴 땐 바로 연락하세요 ›</a>' if d["red"] else "") + '</section>')
     sec = [summary]
@@ -357,7 +356,7 @@ def page(d, css_v):
     more = desc[2:]
     sec.append('<section id="what"><h2><span class="n">1</span>어떤 상태인가요</h2>'
                f'<div class="panel">{figure(d)}' + "".join(f"<p>{e(x)}</p>" for x in rest)
-               + (f'<details><summary>더 읽기</summary>' + "".join(f"<p>{e(x)}</p>" for x in more) + '</details>' if more else "")
+               + (f'<details><summary>상세내용</summary>' + "".join(f"<p>{e(x)}</p>" for x in more) + '</details>' if more else "")
                + '</div></section>')
 
     # 3) 내원 일정 (내원 유도)
@@ -401,8 +400,9 @@ def page(d, css_v):
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="../assets/style.css?v={css_v}">
 </head><body><div class="wrap">
-<header><div class="clinic"><i></i>{CLINIC} · 진료 후 안내</div>
-<h1>{e(main)}</h1>{f'<p class="sub">{e(sub)}</p>' if sub else ''}</header>
+<header class="top"><img class="logo" src="../assets/logo.png" alt="{CLINIC} 로고" width="72" height="72">
+<div class="ttl"><div class="clinic">{CLINIC} · 진료 후 안내</div>
+<h1>{e(main)}</h1>{f'<p class="sub">{e(sub)}</p>' if sub else ''}</div></header>
 {"".join(sec)}
 <footer><p>일반적인 안내입니다. 증상과 운동 단계는 사람마다 달라 진료 때 꼭 상의해 주세요. 영상의 저작권은 각 유튜브 채널에 있습니다.</p></footer>
 </div><script src="../assets/app.js?v={css_v}"></script></body></html>
