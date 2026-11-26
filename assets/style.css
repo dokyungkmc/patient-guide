@@ -15,7 +15,7 @@
   --poster:#0d1f19; --poster-fg:#e7ece9; color-scheme:dark}}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);font-size:17px;line-height:1.7;
+body{margin:0;word-break:keep-all;overflow-wrap:break-word;background:var(--bg);color:var(--fg);font-family:var(--font);font-size:17px;line-height:1.7;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
 .wrap{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:30px}
 h1,h2,h3{text-wrap:balance;margin:0;line-height:1.35}
