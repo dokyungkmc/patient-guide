@@ -228,7 +228,7 @@ def when_row(it):
         return ""
     txt = "모든 시기" if len(st) == len(STAGE) else " · ".join(STAGE[s][1] for s in st)
     dots = "".join(f'<i class="{STAGE[s][0]}"></i>' for s in st)
-    return f'<p class="meta"><span class="k">해당 시기</span><span class="v"><span class="dots">{dots}</span>{e(txt)}</span></p>'
+    return f'<p class="meta"><span class="k">언제 하나요?</span><span class="v"><span class="dots">{dots}</span>{e(txt)}</span></p>'
 
 
 def card(it, kind):
@@ -241,7 +241,7 @@ def card(it, kind):
     title = re.sub(r"\s*\([^)]*\)\s*$", "", it["title"].replace("[루틴]", "따라 하기:").strip())
     rows = "" if (kind == "ls" and it.get("when")) else when_row(it)
     if it.get("when"):
-        rows += f'<p class="meta"><span class="k">언제 하나요</span><span class="v">{e(it["when"])}</span></p>'
+        rows += f'<p class="meta"><span class="k">언제 하나요?</span><span class="v">{e(it["when"])}</span></p>'
     if it.get("dose"):
         dose = re.sub(r"\s*\([^)]*\)\s*$", "", it["dose"])
         rows += f'<p class="meta"><span class="k">횟수</span><span class="v">{e(dose)}</span></p>'

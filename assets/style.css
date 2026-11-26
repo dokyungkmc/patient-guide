@@ -97,7 +97,7 @@ h2 .n{flex:none;width:30px;height:30px;border-radius:50%;background:var(--accent
 .why{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px}
 .why li{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:.97rem;line-height:1.6}
 .why b{display:block;font-size:1.02rem}
-.meta{display:grid;grid-template-columns:5.6em 1fr;gap:8px;font-size:.95rem;align-items:baseline}
+.meta{display:grid;grid-template-columns:6.2em 1fr;gap:8px;font-size:.95rem;align-items:baseline}
 .meta .k{color:var(--muted);font-weight:600}
 .meta .v{font-weight:600}
 .dots{display:inline-flex;gap:3px;margin-right:6px;vertical-align:1px}
