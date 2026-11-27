@@ -10,3 +10,4 @@ document.addEventListener('click', function (ev) {
   f.title = b.getAttribute('aria-label');
   b.replaceWith(f);
 });
+
